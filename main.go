@@ -82,14 +82,31 @@ var rootCmd = cobra.Command{
 				return
 			}
 		}
-		var pinger ping.Ping
+		protocol, err := ping.NewProtocol(schema)
+		if err != nil {
+			fmt.Println(err)
+			cmd.Usage()
+			return
+		}
+		target := ping.Target{
+			Timeout:  timeoutDuration,
+			Interval: intervalDuration,
+			Host:     host,
+			Port:     port,
+			Counter:  counter,
+			Protocol: protocol,
+		}
+		var pinger ping.Pinger
 		if schema == ping.TCP.String() {
-			pinger = ping.NewTCPing(host, port, ping.TCP, counter, timeoutDuration, intervalDuration)
+			pinger = ping.NewTCPing()
+		} else if schema == ping.HTTP.String() {
+			pinger = ping.NewHTTPing()
 		} else {
 			fmt.Printf("schema: %s not support\n", schema)
 			cmd.Usage()
 			return
 		}
+		pinger.SetTarget(&target)
 		pingerDone := pinger.Start()
 		select {
 		case <-pingerDone:

@@ -2,23 +2,16 @@ package ping
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // Protocol ...
 type Protocol int
-
-const (
-	// TCP is tcp protocol
-	TCP Protocol = iota
-	// HTTP is http protocol
-	HTTP
-	// HTTPS is https protocol
-	HTTPS
-)
 
 func (protocol Protocol) String() string {
 	switch protocol {
@@ -30,6 +23,51 @@ func (protocol Protocol) String() string {
 		return "https"
 	}
 	return "unkown"
+}
+
+const (
+	// TCP is tcp protocol
+	TCP Protocol = iota
+	// HTTP is http protocol
+	HTTP
+	// HTTPS is https protocol
+	HTTPS
+)
+
+// NewProtocol convert protocol stirng to Protocol
+func NewProtocol(protocol string) (Protocol, error) {
+	switch strings.ToLower(protocol) {
+	case TCP.String():
+		return TCP, nil
+	case HTTP.String():
+		return HTTP, nil
+	case HTTPS.String():
+		return HTTPS, nil
+	}
+	return 0, fmt.Errorf("protocol %s not support", protocol)
+}
+
+// Target is a ping
+type Target struct {
+	Protocol Protocol
+	Host     string
+	Port     int
+
+	Counter  int
+	Interval time.Duration
+	Timeout  time.Duration
+}
+
+func (target Target) String() string {
+	return fmt.Sprintf("%s://%s:%d", target.Protocol, target.Host, target.Port)
+}
+
+// Pinger is a ping interface
+type Pinger interface {
+	Start() <-chan struct{}
+	Stop()
+	Result() *Result
+	SetTarget(target *Target)
 }
 
 // Ping is a ping interface
@@ -50,7 +88,7 @@ type Ping interface {
 type Result struct {
 	Counter        int
 	SuccessCounter int
-	Pinger         Ping
+	Target         *Target
 
 	MinDuration   time.Duration
 	MaxDuration   time.Duration
@@ -72,7 +110,7 @@ func (result Result) Failed() int {
 
 func (result Result) String() string {
 	const resultTpl = `
-Ping statistics {{.Pinger.Protocol}}://{{.Pinger.Host}}:{{.Pinger.Port}}
+Ping statistics {{.Target}}
 	{{.Counter}} probes sent.
 	{{.SuccessCounter}} successful, {{.Failed}} failed.
 Approximate trip times:
