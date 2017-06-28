@@ -28,9 +28,19 @@ var (
 )
 
 var rootCmd = cobra.Command{
-	Use:   "tcping",
+	Use:   "tcping host port",
 	Short: "tcping is a tcp ping",
-	Long:  "tcping is a tcp ping",
+	Long:  "tcping is a ping over tcp connection",
+	Example: `
+  1. ping over tcp
+	> tcping google.com
+  2. ping over tcp with custom port
+	> tcping google.com 443
+  3. ping over http
+  	> tcping -H google.com
+  4. ping with URI schema
+  	> tcping http://hui.lu
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if showVersion {
 			fmt.Printf("version: %s\n", version)
@@ -107,9 +117,10 @@ var rootCmd = cobra.Command{
 			Protocol: protocol,
 		}
 		var pinger ping.Pinger
-		if schema == ping.TCP.String() {
+		switch protocol {
+		case ping.TCP:
 			pinger = ping.NewTCPing()
-		} else if schema == ping.HTTP.String() || schema == ping.HTTPS.String() {
+		case ping.HTTP, ping.HTTPS:
 			var httpMethod string
 			switch {
 			case httpHead:
@@ -120,11 +131,12 @@ var rootCmd = cobra.Command{
 				httpMethod = "GET"
 			}
 			pinger = ping.NewHTTPing(httpMethod)
-		} else {
+		default:
 			fmt.Printf("schema: %s not support\n", schema)
 			cmd.Usage()
 			return
 		}
+
 		pinger.SetTarget(&target)
 		pingerDone := pinger.Start()
 		select {
