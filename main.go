@@ -15,7 +15,8 @@ import (
 
 var (
 	showVersion bool
-	version     = "dev"
+	version     string
+	gitCommit   string
 	counter     int
 	timeout     string
 	interval    string
@@ -44,6 +45,7 @@ var rootCmd = cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if showVersion {
 			fmt.Printf("version: %s\n", version)
+			fmt.Printf("git: %s\n", gitCommit)
 			return
 		}
 		if len(args) != 2 && len(args) != 1 {
