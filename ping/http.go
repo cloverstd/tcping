@@ -1,6 +1,7 @@
 package ping
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,10 +20,10 @@ type HTTPing struct {
 var _ Pinger = (*HTTPing)(nil)
 
 // NewHTTPing return new HTTPing
-func NewHTTPing() *HTTPing {
+func NewHTTPing(method string) *HTTPing {
 	return &HTTPing{
 		done:   make(chan struct{}),
-		Method: "GET",
+		Method: method,
 	}
 }
 
@@ -53,7 +54,7 @@ func (ping *HTTPing) Start() <-chan struct{} {
 				} else {
 					defer resp.Body.Close()
 					length, _ := io.Copy(ioutil.Discard, resp.Body)
-					fmt.Printf("Ping %s - HTTP is open - time=%s status=%d bytes=%d\n", ping.target, duration, resp.StatusCode, length)
+					fmt.Printf("Ping %s - %s is open - time=%s method=%s status=%d bytes=%d\n", ping.target, ping.target.Protocol, duration, ping.Method, resp.StatusCode, length)
 					if ping.result.MinDuration == 0 {
 						ping.result.MinDuration = duration
 					}
@@ -88,10 +89,16 @@ func (ping *HTTPing) Stop() {
 
 func (ping HTTPing) ping() (time.Duration, *http.Response, error) {
 	var resp *http.Response
-	req, err := http.NewRequest(ping.Method, ping.target.String(), nil)
+	var body io.Reader
+	if ping.Method == "POST" {
+		body = bytes.NewBufferString("{}")
+	}
+	req, err := http.NewRequest(ping.Method, ping.target.String(), body)
+	req.Header.Set(http.CanonicalHeaderKey("User-Agent"), "tcping")
 	if err != nil {
 		return 0, nil, err
 	}
+
 	duration, errIfce := timeIt(func() interface{} {
 		client := http.Client{Timeout: ping.target.Timeout}
 		resp, err = client.Do(req)

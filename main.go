@@ -20,6 +20,11 @@ var (
 	timeout     string
 	interval    string
 	sigs        chan os.Signal
+
+	httpMode bool
+	httpHead bool
+	httpPost bool
+	httpUA   string
 )
 
 var rootCmd = cobra.Command{
@@ -82,11 +87,16 @@ var rootCmd = cobra.Command{
 				return
 			}
 		}
-		protocol, err := ping.NewProtocol(schema)
-		if err != nil {
-			fmt.Println(err)
-			cmd.Usage()
-			return
+		var protocol ping.Protocol
+		if httpMode {
+			protocol = ping.HTTP
+		} else {
+			protocol, err = ping.NewProtocol(schema)
+			if err != nil {
+				fmt.Println(err)
+				cmd.Usage()
+				return
+			}
 		}
 		target := ping.Target{
 			Timeout:  timeoutDuration,
@@ -99,8 +109,17 @@ var rootCmd = cobra.Command{
 		var pinger ping.Pinger
 		if schema == ping.TCP.String() {
 			pinger = ping.NewTCPing()
-		} else if schema == ping.HTTP.String() {
-			pinger = ping.NewHTTPing()
+		} else if schema == ping.HTTP.String() || schema == ping.HTTPS.String() {
+			var httpMethod string
+			switch {
+			case httpHead:
+				httpMethod = "HEAD"
+			case httpPost:
+				httpMethod = "POST"
+			default:
+				httpMethod = "GET"
+			}
+			pinger = ping.NewHTTPing(httpMethod)
 		} else {
 			fmt.Printf("schema: %s not support\n", schema)
 			cmd.Usage()
@@ -124,6 +143,12 @@ func init() {
 	rootCmd.Flags().IntVarP(&counter, "counter", "c", 4, "ping counter")
 	rootCmd.Flags().StringVarP(&timeout, "timeout", "T", "1s", `connect timeout, units are "ns", "us" (or "µs"), "ms", "s", "m", "h"`)
 	rootCmd.Flags().StringVarP(&interval, "interval", "I", "1s", `ping interval, units are "ns", "us" (or "µs"), "ms", "s", "m", "h"`)
+
+	rootCmd.Flags().BoolVarP(&httpMode, "http", "H", false, `Use "HTTP" mode. will ignore URI Schema, force to http`)
+	rootCmd.Flags().BoolVar(&httpHead, "head", false, `Use POST instead of GET in http mode.`)
+	rootCmd.Flags().BoolVar(&httpPost, "post", false, `Use HEAD instead of GET in http mode.`)
+	rootCmd.Flags().StringVar(&httpUA, "user-agent", "tcping", `Use custom UA in http mode.`)
+
 }
 
 func main() {
