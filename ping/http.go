@@ -39,6 +39,7 @@ func (ping *HTTPing) SetTarget(target *Target) {
 func (ping *HTTPing) Start() <-chan struct{} {
 	go func() {
 		t := time.NewTicker(ping.target.Interval)
+		defer t.Stop()
 		for {
 			select {
 			case <-t.C:
