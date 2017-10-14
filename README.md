@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/cloverstd/tcping.svg?branch=master)](https://travis-ci.org/cloverstd/tcping)
+
 # tcping
 
 tcping is like [tcping.exe](https://elifulkerson.com/projects/tcping.php), but written with Golang.
