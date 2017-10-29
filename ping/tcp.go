@@ -40,6 +40,7 @@ func (tcping TCPing) Result() *Result {
 func (tcping TCPing) Start() <-chan struct{} {
 	go func() {
 		t := time.NewTicker(tcping.target.Interval)
+		defer t.Stop()
 		for {
 			select {
 			case <-t.C:
@@ -47,13 +48,13 @@ func (tcping TCPing) Start() <-chan struct{} {
 					tcping.Stop()
 					return
 				}
-				duration, err := tcping.ping()
+				duration, remoteAddr, err := tcping.ping()
 				tcping.result.Counter++
 
 				if err != nil {
 					fmt.Printf("Ping %s - failed: %s\n", tcping.target, err)
 				} else {
-					fmt.Printf("Ping %s - Connected - time=%s\n", tcping.target, duration)
+					fmt.Printf("Ping %s(%s) - Connected - time=%s\n", tcping.target, remoteAddr, duration)
 
 					if tcping.result.MinDuration == 0 {
 						tcping.result.MinDuration = duration
@@ -82,18 +83,20 @@ func (tcping *TCPing) Stop() {
 	tcping.done <- struct{}{}
 }
 
-func (tcping TCPing) ping() (time.Duration, error) {
+func (tcping TCPing) ping() (time.Duration, net.Addr, error) {
+	var remoteAddr net.Addr
 	duration, errIfce := timeIt(func() interface{} {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", tcping.target.Host, tcping.target.Port), tcping.target.Timeout)
 		if err != nil {
 			return err
 		}
+		remoteAddr = conn.RemoteAddr()
 		conn.Close()
 		return nil
 	})
 	if errIfce != nil {
 		err := errIfce.(error)
-		return 0, err
+		return 0, remoteAddr, err
 	}
-	return time.Duration(duration), nil
+	return time.Duration(duration), remoteAddr, nil
 }
