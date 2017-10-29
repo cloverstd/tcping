@@ -13,6 +13,7 @@ func timeIt(f func() interface{}) (int64, interface{}) {
 	return endAt.UnixNano() - startAt.UnixNano(), res
 }
 
+// UseCustomeDNS will set the dns to default DNS resolver for global
 func UseCustomeDNS(dns []string) {
 	resolver := net.Resolver{
 		PreferGo: true,
