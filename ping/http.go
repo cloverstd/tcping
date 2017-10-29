@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/http/httptrace"
 	"time"
 )
 
@@ -47,7 +49,7 @@ func (ping *HTTPing) Start() <-chan struct{} {
 					ping.Stop()
 					return
 				}
-				duration, resp, err := ping.ping()
+				duration, resp, remoteAddr, err := ping.ping()
 				ping.result.Counter++
 
 				if err != nil {
@@ -55,7 +57,7 @@ func (ping *HTTPing) Start() <-chan struct{} {
 				} else {
 					defer resp.Body.Close()
 					length, _ := io.Copy(ioutil.Discard, resp.Body)
-					fmt.Printf("Ping %s - %s is open - time=%s method=%s status=%d bytes=%d\n", ping.target, ping.target.Protocol, duration, ping.Method, resp.StatusCode, length)
+					fmt.Printf("Ping %s(%s) - %s is open - time=%s method=%s status=%d bytes=%d\n", ping.target, remoteAddr, ping.target.Protocol, duration, ping.Method, resp.StatusCode, length)
 					if ping.result.MinDuration == 0 {
 						ping.result.MinDuration = duration
 					}
@@ -88,7 +90,7 @@ func (ping *HTTPing) Stop() {
 	ping.done <- struct{}{}
 }
 
-func (ping HTTPing) ping() (time.Duration, *http.Response, error) {
+func (ping HTTPing) ping() (time.Duration, *http.Response, net.Addr, error) {
 	var resp *http.Response
 	var body io.Reader
 	if ping.Method == "POST" {
@@ -97,9 +99,15 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, error) {
 	req, err := http.NewRequest(ping.Method, ping.target.String(), body)
 	req.Header.Set(http.CanonicalHeaderKey("User-Agent"), "tcping")
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
-
+	var remoteAddr net.Addr
+	trace := &httptrace.ClientTrace{
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			remoteAddr = connInfo.Conn.RemoteAddr()
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	duration, errIfce := timeIt(func() interface{} {
 		client := http.Client{Timeout: ping.target.Timeout}
 		resp, err = client.Do(req)
@@ -107,7 +115,7 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, error) {
 	})
 	if errIfce != nil {
 		err := errIfce.(error)
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
-	return time.Duration(duration), resp, nil
+	return time.Duration(duration), resp, remoteAddr, nil
 }
