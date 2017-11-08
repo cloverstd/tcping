@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptrace"
 	"time"
@@ -90,7 +89,7 @@ func (ping *HTTPing) Stop() {
 	ping.done <- struct{}{}
 }
 
-func (ping HTTPing) ping() (time.Duration, *http.Response, net.Addr, error) {
+func (ping HTTPing) ping() (time.Duration, *http.Response, string, error) {
 	var resp *http.Response
 	var body io.Reader
 	if ping.Method == "POST" {
@@ -99,12 +98,12 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, net.Addr, error) {
 	req, err := http.NewRequest(ping.Method, ping.target.String(), body)
 	req.Header.Set(http.CanonicalHeaderKey("User-Agent"), "tcping")
 	if err != nil {
-		return 0, nil, nil, err
+		return 0, nil, "", err
 	}
-	var remoteAddr net.Addr
+	var remoteAddr string
 	trace := &httptrace.ClientTrace{
-		GotConn: func(connInfo httptrace.GotConnInfo) {
-			remoteAddr = connInfo.Conn.RemoteAddr()
+		ConnectStart: func(network, addr string) {
+			remoteAddr = addr
 		},
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
@@ -115,7 +114,7 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, net.Addr, error) {
 	})
 	if errIfce != nil {
 		err := errIfce.(error)
-		return 0, nil, nil, err
+		return 0, nil, "", err
 	}
 	return time.Duration(duration), resp, remoteAddr, nil
 }
