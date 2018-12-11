@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -114,6 +116,13 @@ var rootCmd = cobra.Command{
 		}
 		if len(dnsServer) != 0 {
 			ping.UseCustomeDNS(dnsServer)
+		}
+
+		// check host is ipv6 ?
+		parseHost := net.ParseIP(strings.Trim(host, "[]"))
+		if parseHost.To16() != nil {
+			// ipv6
+			host = fmt.Sprintf("[%s]", strings.Trim(host, "[]"))
 		}
 		target := ping.Target{
 			Timeout:  timeoutDuration,
