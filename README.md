@@ -9,7 +9,7 @@ tcping is like [tcping.exe](https://elifulkerson.com/projects/tcping.php), but w
 
 * The default count of ping is 4.
 
-* If the port is emit, the default port is 80.
+* If the port is omitted, the default port is 80.
 
 * The default interval of ping is 1s.
 
