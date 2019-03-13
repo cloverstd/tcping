@@ -9,7 +9,7 @@ import (
 
 	"strconv"
 
-	"github.com/recall704/tcping/ping"
+	"github.com/cloverstd/tcping/ping"
 	"github.com/spf13/cobra"
 )
 
