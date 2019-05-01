@@ -1,5 +1,0 @@
-package: github.com/cloverstd/tcping
-import:
-- package: github.com/spf13/cobra
-  subpackages:
-  - cobra

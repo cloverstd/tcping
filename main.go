@@ -118,16 +118,11 @@ var rootCmd = cobra.Command{
 			ping.UseCustomeDNS(dnsServer)
 		}
 
-		// check host is ipv6 ?
-		parseHost := net.ParseIP(strings.Trim(host, "[]"))
-		if parseHost.To16() != nil {
-			// ipv6
-			host = fmt.Sprintf("[%s]", strings.Trim(host, "[]"))
-		}
+		parseHost := ping.FormatIP(host)
 		target := ping.Target{
 			Timeout:  timeoutDuration,
 			Interval: intervalDuration,
-			Host:     host,
+			Host:     parseHost,
 			Port:     port,
 			Counter:  counter,
 			Protocol: protocol,
