@@ -1,4 +1,4 @@
-module github.com/recall704/tcping
+module github.com/cloverstd/tcping
 
 go 1.12
 
