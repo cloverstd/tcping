@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -147,7 +145,6 @@ var rootCmd = cobra.Command{
 			cmd.Usage()
 			return
 		}
-
 		pinger.SetTarget(&target)
 		pingerDone := pinger.Start()
 		select {
