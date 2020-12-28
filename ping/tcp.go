@@ -39,11 +39,15 @@ func (tcping TCPing) Result() *Result {
 // Start a tcping
 func (tcping TCPing) Start() <-chan struct{} {
 	go func() {
-		t := time.NewTicker(tcping.target.Interval)
+		// cheap workaround to not wait for Interval seconds to get the 1st ping: set short wait time and ...
+		t := time.NewTicker(1)
 		defer t.Stop()
 		for {
 			select {
 			case <-t.C:
+				// ... change to real Interval after the 1st run
+				t = time.NewTicker(tcping.target.Interval)
+
 				if tcping.result.Counter >= tcping.target.Counter && tcping.target.Counter != 0 {
 					tcping.Stop()
 					return
