@@ -46,7 +46,7 @@ func (tcping TCPing) Start() <-chan struct{} {
 			select {
 			case <-t.C:
 				// ... change to real Interval after the 1st run
-				t = time.NewTicker(tcping.target.Interval)
+				t.Reset(tcping.target.Interval)
 
 				if tcping.result.Counter >= tcping.target.Counter && tcping.target.Counter != 0 {
 					tcping.Stop()
