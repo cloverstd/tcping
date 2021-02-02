@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
+	"net/url"
 	"time"
 )
 
@@ -96,10 +97,12 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, string, error) {
 		body = bytes.NewBufferString("{}")
 	}
 	req, err := http.NewRequest(ping.Method, ping.target.String(), body)
-	req.Header.Set(http.CanonicalHeaderKey("User-Agent"), "tcping")
 	if err != nil {
 		return 0, nil, "", err
 	}
+
+	req.Header.Set(http.CanonicalHeaderKey("User-Agent"), "tcping")
+
 	var remoteAddr string
 	trace := &httptrace.ClientTrace{
 		ConnectStart: func(network, addr string) {
@@ -108,7 +111,21 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, string, error) {
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	duration, errIfce := timeIt(func() interface{} {
-		client := http.Client{Timeout: ping.target.Timeout}
+		client := http.Client{
+			Timeout: ping.target.Timeout,
+		}
+
+		if ping.target.Proxy != "" {
+			var parProxy *url.URL
+			parProxy, err = url.Parse(ping.target.Proxy)
+			if err != nil {
+				return err
+			}
+			client.Transport = &http.Transport{
+				Proxy: http.ProxyURL(parProxy),
+			}
+		}
+
 		resp, err = client.Do(req)
 		return err
 	})
