@@ -52,6 +52,7 @@ type Target struct {
 	Protocol Protocol
 	Host     string
 	Port     int
+	Proxy    string
 
 	Counter  int
 	Interval time.Duration

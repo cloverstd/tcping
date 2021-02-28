@@ -2,11 +2,16 @@ package ping
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"golang.org/x/net/proxy"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptrace"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -96,10 +101,12 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, string, error) {
 		body = bytes.NewBufferString("{}")
 	}
 	req, err := http.NewRequest(ping.Method, ping.target.String(), body)
-	req.Header.Set(http.CanonicalHeaderKey("User-Agent"), "tcping")
 	if err != nil {
 		return 0, nil, "", err
 	}
+
+	req.Header.Set(http.CanonicalHeaderKey("User-Agent"), "tcping")
+
 	var remoteAddr string
 	trace := &httptrace.ClientTrace{
 		ConnectStart: func(network, addr string) {
@@ -108,7 +115,45 @@ func (ping HTTPing) ping() (time.Duration, *http.Response, string, error) {
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	duration, errIfce := timeIt(func() interface{} {
-		client := http.Client{Timeout: ping.target.Timeout}
+		client := http.Client{
+			Timeout: ping.target.Timeout,
+		}
+
+		proxyProco := ping.target.Proxy
+		if ping.target.Proxy != "" {
+
+			var (
+				parProxy *url.URL
+				dialer   proxy.Dialer
+			)
+
+			httpTransport := &http.Transport{}
+
+			if strings.HasPrefix(proxyProco, "http") {
+				parProxy, err = url.Parse(ping.target.Proxy)
+				if err != nil {
+					return err
+				}
+				httpTransport.Proxy = http.ProxyURL(parProxy)
+
+			} else if strings.HasPrefix(proxyProco, "sock") {
+
+				dialer, err = proxy.SOCKS5("tcp", proxyProco[strings.Index(proxyProco, "//")+2:], nil, proxy.Direct)
+				if err != nil {
+					return fmt.Errorf("can't connect to the proxy: %s", err)
+				}
+
+				httpTransport.DialContext = func(ctx context.Context, network string, addr string) (net.Conn, error) {
+					return dialer.Dial(network, addr)
+				}
+
+			} else {
+				return fmt.Errorf("%s", "please enter the correct agency procotol")
+			}
+
+			client.Transport = httpTransport
+		}
+
 		resp, err = client.Do(req)
 		return err
 	})
