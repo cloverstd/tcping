@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"golang.org/x/net/proxy"
 	"io"
 	"io/ioutil"
 	"net"
@@ -13,23 +12,27 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 // HTTPing ...
 type HTTPing struct {
-	target *Target
-	done   chan struct{}
-	result *Result
-	Method string
+	target  *Target
+	done    chan struct{}
+	result  *Result
+	Method  string
+	isQuiet bool
 }
 
 var _ Pinger = (*HTTPing)(nil)
 
 // NewHTTPing return new HTTPing
-func NewHTTPing(method string) *HTTPing {
+func NewHTTPing(method string, isQuiet bool) *HTTPing {
 	return &HTTPing{
-		done:   make(chan struct{}),
-		Method: method,
+		done:    make(chan struct{}),
+		Method:  method,
+		isQuiet: isQuiet,
 	}
 }
 
@@ -57,11 +60,15 @@ func (ping *HTTPing) Start() <-chan struct{} {
 				ping.result.Counter++
 
 				if err != nil {
-					fmt.Printf("Ping %s - failed: %s\n", ping.target, err)
+					if !ping.isQuiet {
+						fmt.Printf("Ping %s - failed: %s\n", ping.target, err)
+					}
 				} else {
 					defer resp.Body.Close()
 					length, _ := io.Copy(ioutil.Discard, resp.Body)
-					fmt.Printf("Ping %s(%s) - %s is open - time=%s method=%s status=%d bytes=%d\n", ping.target, remoteAddr, ping.target.Protocol, duration, ping.Method, resp.StatusCode, length)
+					if !ping.isQuiet {
+						fmt.Printf("Ping %s(%s) - %s is open - time=%s method=%s status=%d bytes=%d\n", ping.target, remoteAddr, ping.target.Protocol, duration, ping.Method, resp.StatusCode, length)
+					}
 					if ping.result.MinDuration == 0 {
 						ping.result.MinDuration = duration
 					}

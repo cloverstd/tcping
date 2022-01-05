@@ -87,13 +87,13 @@ type Ping interface {
 
 // Result ...
 type Result struct {
-	Counter        int
-	SuccessCounter int
-	Target         *Target
+	Counter        int     `json:"counter"`
+	SuccessCounter int     `json:"success_counter"`
+	Target         *Target `json:"target"`
 
-	MinDuration   time.Duration
-	MaxDuration   time.Duration
-	TotalDuration time.Duration
+	MinDuration   time.Duration `json:"min_duration"`
+	MaxDuration   time.Duration `json:"max_duration"`
+	TotalDuration time.Duration `json:"total_duration"`
 }
 
 // Avg return the average time of ping

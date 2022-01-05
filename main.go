@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -29,6 +30,9 @@ var (
 	httpUA   string
 
 	dnsServer []string
+
+	output  string
+	isQuiet bool
 )
 
 var rootCmd = cobra.Command{
@@ -130,7 +134,7 @@ var rootCmd = cobra.Command{
 		var pinger ping.Pinger
 		switch protocol {
 		case ping.TCP:
-			pinger = ping.NewTCPing()
+			pinger = ping.NewTCPing(isQuiet)
 		case ping.HTTP, ping.HTTPS:
 			var httpMethod string
 			switch {
@@ -141,7 +145,7 @@ var rootCmd = cobra.Command{
 			default:
 				httpMethod = "GET"
 			}
-			pinger = ping.NewHTTPing(httpMethod)
+			pinger = ping.NewHTTPing(httpMethod, isQuiet)
 		default:
 			fmt.Printf("schema: %s not support\n", schema)
 			cmd.Usage()
@@ -156,7 +160,15 @@ var rootCmd = cobra.Command{
 			break
 		}
 
-		fmt.Println(pinger.Result())
+		switch output {
+		case "text":
+			fmt.Println(pinger.Result())
+		case "json":
+			jsonResult, _ := json.Marshal(pinger.Result())
+			fmt.Println(string(jsonResult))
+		default:
+			fmt.Println("output error")
+		}
 	},
 }
 
@@ -173,6 +185,8 @@ func init() {
 	rootCmd.Flags().StringVar(&httpUA, "user-agent", "tcping", `Use custom UA in http mode.`)
 
 	rootCmd.Flags().StringArrayVarP(&dnsServer, "dns-server", "D", nil, `Use the specified dns resolve server.`)
+	rootCmd.Flags().StringVarP(&output, "output", "o", "text", `Output format.One of: text|json`)
+	rootCmd.Flags().BoolVarP(&isQuiet, "quiet", "q", false, `Output format.One of: text|json`)
 
 }
 

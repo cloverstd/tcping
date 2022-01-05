@@ -8,17 +8,19 @@ import (
 
 // TCPing ...
 type TCPing struct {
-	target *Target
-	done   chan struct{}
-	result *Result
+	target  *Target
+	done    chan struct{}
+	result  *Result
+	isQuiet bool
 }
 
 var _ Pinger = (*TCPing)(nil)
 
 // NewTCPing return a new TCPing
-func NewTCPing() *TCPing {
+func NewTCPing(isQuiet bool) *TCPing {
 	tcping := TCPing{
-		done: make(chan struct{}),
+		done:    make(chan struct{}),
+		isQuiet: isQuiet,
 	}
 	return &tcping
 }
@@ -52,10 +54,13 @@ func (tcping TCPing) Start() <-chan struct{} {
 				tcping.result.Counter++
 
 				if err != nil {
-					fmt.Printf("Ping %s - failed: %s\n", tcping.target, err)
+					if !tcping.isQuiet {
+						fmt.Printf("Ping %s - failed: %s\n", tcping.target, err)
+					}
 				} else {
-					fmt.Printf("Ping %s(%s) - Connected - time=%s\n", tcping.target, remoteAddr, duration)
-
+					if !tcping.isQuiet {
+						fmt.Printf("Ping %s(%s) - Connected - time=%s\n", tcping.target, remoteAddr, duration)
+					}
 					if tcping.result.MinDuration == 0 {
 						tcping.result.MinDuration = duration
 					}

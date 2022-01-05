@@ -16,3 +16,5 @@
 dist
 *.tar.gz
 .idea/
+tcping
+.vscode/

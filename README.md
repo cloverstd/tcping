@@ -46,3 +46,8 @@ Ping statistics http://hui.lu:80
 Approximate trip times:
 	Minimum = 56.750403ms, Maximum = 232.880173ms, Average = 101.903482ms
 ```
+### Quiet and JSON output
+```json
+> ./tcping github.com 443 -o json -q
+{"counter":4,"success_counter":1,"target":{"Protocol":0,"Host":"github.com","Port":443,"Proxy":"","Counter":4,"Interval":1000000000,"Timeout":1000000000},"min_duration":99924900,"max_duration":99924900,"total_duration":99924900}
+```
