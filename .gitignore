@@ -16,3 +16,6 @@
 dist
 *.tar.gz
 .idea/
+
+tcping
+tcping.exe
