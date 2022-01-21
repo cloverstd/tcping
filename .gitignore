@@ -17,5 +17,8 @@ dist
 *.tar.gz
 .idea/
 
+vendor/
+build/
+
 tcping
 tcping.exe
