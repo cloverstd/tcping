@@ -1,19 +1,16 @@
-[![Build Status](https://travis-ci.org/cloverstd/tcping.svg?branch=master)](https://travis-ci.org/cloverstd/tcping)
-
 # tcping
 
 tcping is like [tcping.exe](https://elifulkerson.com/projects/tcping.php), but written with Golang.
 
-
 ## Usage
 
-* The default count of ping is 4.
+- The default count of ping is 4.
 
-* If the port is omitted, the default port is 80.
+- If the port is omitted, the default port is 80.
 
-* The default interval of ping is 1s.
+- The default interval of ping is 1s.
 
-* The default timeout of ping is 1s.
+- The default timeout of ping is 1s.
 
 ### ping tcp
 
