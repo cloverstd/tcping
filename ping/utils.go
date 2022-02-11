@@ -40,12 +40,16 @@ func UseCustomeDNS(dns []string) {
 // string - return "" if the input is neither valid IPv4 nor valid IPv6
 //          return IPv4 in format like "192.168.9.1"
 //          return IPv6 in format like "[2002:ac1f:91c5:1::bd59]"
-func FormatIP(IP string) string {
+func FormatIP(IP string) (string, error) {
 
 	host := strings.Trim(IP, "[ ]")
-	if parseIP := net.ParseIP(host); parseIP != nil && parseIP.To4() == nil {
-		host = fmt.Sprintf("[%s]", host)
+	if parseIP := net.ParseIP(host); parseIP != nil {
+		// valid ip
+		if parseIP.To4() == nil {
+			// ipv6
+			host = fmt.Sprintf("[%s]", host)
+		}
+		return host, nil
 	}
-
-	return host
+	return "", fmt.Errorf("Error IP format")
 }

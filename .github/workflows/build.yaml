@@ -20,12 +20,13 @@ jobs:
         with:
           go-version: 1.17.6
 
-      - name: Prepare environment
+      - name: Prepare environment and test
         run: |-
           RELEASE_VERSION="${GITHUB_REF##*/}"
           if [[ "${RELEASE_VERSION}" != v* ]]; then RELEASE_VERSION='dev'; fi
           echo "RELEASE_VERSION=\"${RELEASE_VERSION}@${GITHUB_SHA:0:10}\"" | tee -a $GITHUB_ENV
           go mod vendor
+          go test ./... -v
 
       # Win
       - run: GOOS=windows GOARCH=386 VERSION=${RELEASE_VERSION} make release
