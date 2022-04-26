@@ -118,6 +118,9 @@ var rootCmd = cobra.Command{
 		}
 
 		parseHost, _ := ping.FormatIP(host)
+		if len(parseHost) <= 0 {
+			parseHost = host
+		}
 		target := ping.Target{
 			Timeout:  timeoutDuration,
 			Interval: intervalDuration,
