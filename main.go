@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"syscall"
-	"time"
-
 	"strconv"
+	"syscall"
 
 	"github.com/cloverstd/tcping/ping"
 	"github.com/spf13/cobra"
@@ -43,7 +41,7 @@ var rootCmd = cobra.Command{
   3. ping over http
   	> tcping -H google.com
   4. ping with URI schema
-  	> tcping http://hui.lu
+  	> tcping https://hui.lu
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if showVersion {
@@ -51,70 +49,62 @@ var rootCmd = cobra.Command{
 			fmt.Printf("git: %s\n", gitCommit)
 			return
 		}
-		if len(args) != 2 && len(args) != 1 {
+		if len(args) == 0 {
 			cmd.Usage()
+			return
+		}
+		if len(args) > 2 {
+			cmd.Println("invalid command arguments")
 			return
 		}
 		host := args[0]
 
+		url, err := ping.ParseAddress(host)
+		if err != nil {
+			fmt.Printf("%s is an invalid target.\n", host)
+			return
+		}
+		defaultPort := "80"
+		if len(args) > 1 {
+			defaultPort = args[1]
+		}
+		port, err := strconv.Atoi(defaultPort)
+		if err != nil {
+			cmd.Printf("%s is invalid port.\n", defaultPort)
+			return
+		}
+		url.Host = fmt.Sprintf("%s:%d", url.Hostname(), port)
+
 		var (
-			err    error
-			port   int
 			schema string
 		)
-		if len(args) == 2 {
-			port, err = strconv.Atoi(args[1])
-			if err != nil {
-				fmt.Println("port should be integer")
-				cmd.Usage()
-				return
-			}
-			schema = ping.TCP.String()
-		} else {
-			var matched bool
-			schema, host, port, matched = ping.CheckURI(host)
-			if !matched {
-				fmt.Println("not a valid uri")
-				cmd.Usage()
-				return
-			}
-		}
-		var timeoutDuration time.Duration
-		if res, err := strconv.Atoi(timeout); err == nil {
-			timeoutDuration = time.Duration(res) * time.Millisecond
-		} else {
-			timeoutDuration, err = time.ParseDuration(timeout)
-			if err != nil {
-				fmt.Println("parse timeout failed", err)
-				cmd.Usage()
-				return
-			}
+
+		timeoutDuration, err := ping.ParseDuration(timeout)
+		if err != nil {
+			cmd.Println("parse timeout failed", err)
+			cmd.Usage()
+			return
 		}
 
-		var intervalDuration time.Duration
-		if res, err := strconv.Atoi(interval); err == nil {
-			intervalDuration = time.Duration(res) * time.Millisecond
-		} else {
-			intervalDuration, err = time.ParseDuration(interval)
-			if err != nil {
-				fmt.Println("parse interval failed", err)
-				cmd.Usage()
-				return
-			}
+		intervalDuration, err := ping.ParseDuration(interval)
+		if err != nil {
+			cmd.Println("parse interval failed", err)
+			cmd.Usage()
+			return
 		}
-		var protocol ping.Protocol
+
 		if httpMode {
-			protocol = ping.HTTP
-		} else {
-			protocol, err = ping.NewProtocol(schema)
-			if err != nil {
-				fmt.Println(err)
-				cmd.Usage()
-				return
-			}
+			url.Scheme = ping.HTTP.String()
 		}
+		protocol, err := ping.NewProtocol(url.Scheme)
+		if err != nil {
+			cmd.Println("invalid protocol", err)
+			cmd.Usage()
+			return
+		}
+
 		if len(dnsServer) != 0 {
-			ping.UseCustomeDNS(dnsServer)
+			ping.UseCustomDNS(dnsServer)
 		}
 
 		parseHost, _ := ping.FormatIP(host)

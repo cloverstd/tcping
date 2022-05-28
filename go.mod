@@ -1,6 +1,6 @@
 module github.com/cloverstd/tcping
 
-go 1.17
+go 1.18
 
 require (
 	github.com/smartystreets/goconvey v1.7.2

@@ -22,7 +22,7 @@ func (protocol Protocol) String() string {
 	case HTTPS:
 		return "https"
 	}
-	return "unkown"
+	return "unknown"
 }
 
 const (
@@ -34,7 +34,7 @@ const (
 	HTTPS
 )
 
-// NewProtocol convert protocol stirng to Protocol
+// NewProtocol convert protocol string to Protocol
 func NewProtocol(protocol string) (Protocol, error) {
 	switch strings.ToLower(protocol) {
 	case TCP.String():

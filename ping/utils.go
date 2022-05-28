@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,8 +16,8 @@ func timeIt(f func() interface{}) (int64, interface{}) {
 	return endAt.UnixNano() - startAt.UnixNano(), res
 }
 
-// UseCustomeDNS will set the dns to default DNS resolver for global
-func UseCustomeDNS(dns []string) {
+// UseCustomDNS will set the dns to default DNS resolver for global
+func UseCustomDNS(dns []string) {
 	resolver := net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (conn net.Conn, err error) {
@@ -52,4 +53,12 @@ func FormatIP(IP string) (string, error) {
 		return host, nil
 	}
 	return "", fmt.Errorf("Error IP format")
+}
+
+// ParseDuration parse the t as time.Duration, it will parse t as mills when missing unit.
+func ParseDuration(t string) (time.Duration, error) {
+	if timeout, err := strconv.ParseInt(t, 10, 64); err == nil {
+		return time.Duration(timeout) * time.Millisecond, nil
+	}
+	return time.ParseDuration(t)
 }
