@@ -2,13 +2,32 @@ package ping
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"html/template"
-	"regexp"
-	"strconv"
+	"io"
+	"math"
+	"net"
+	"net/url"
+	"os"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
+
+var pinger = map[Protocol]Factory{}
+
+type Factory func(url *url.URL, op *Option) (Ping, error)
+
+func Register(protocol Protocol, factory Factory) {
+	pinger[protocol] = factory
+}
+
+func Load(protocol Protocol) Factory {
+	return pinger[protocol]
+}
 
 // Protocol ...
 type Protocol int
@@ -47,10 +66,18 @@ func NewProtocol(protocol string) (Protocol, error) {
 	return 0, fmt.Errorf("protocol %s not support", protocol)
 }
 
+type Option struct {
+	Timeout  time.Duration
+	Resolver *net.Resolver
+	Proxy    *url.URL
+	UA       string
+}
+
 // Target is a ping
 type Target struct {
 	Protocol Protocol
 	Host     string
+	IP       string
 	Port     int
 	Proxy    string
 
@@ -63,26 +90,183 @@ func (target Target) String() string {
 	return fmt.Sprintf("%s://%s:%d", target.Protocol, target.Host, target.Port)
 }
 
-// Pinger is a ping interface
-type Pinger interface {
-	Start() <-chan struct{}
-	Stop()
-	Result() *Result
-	SetTarget(target *Target)
+type Stats struct {
+	Connected   bool                    `json:"connected"`
+	Error       error                   `json:"error"`
+	Duration    time.Duration           `json:"duration"`
+	DNSDuration time.Duration           `json:"DNSDuration"`
+	Address     string                  `json:"address"`
+	Meta        map[string]fmt.Stringer `json:"meta"`
+	Extra       fmt.Stringer            `json:"extra"`
 }
 
-// Ping is a ping interface
+func (s *Stats) FormatMeta() string {
+	keys := make([]string, 0, len(s.Meta))
+	for key := range s.Meta {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var builder strings.Builder
+	for i, key := range keys {
+		builder.WriteString(key)
+		builder.WriteString("=")
+		builder.WriteString(s.Meta[key].String())
+		if i < len(keys)-1 {
+			builder.WriteString(" ")
+		}
+	}
+	return builder.String()
+}
+
 type Ping interface {
-	Start() <-chan struct{}
+	Ping(ctx context.Context) *Stats
+}
 
-	Host() string
-	Port() int
-	Protocol() Protocol
-	Counter() int
+func NewPinger(out io.Writer, url *url.URL, ping Ping, interval time.Duration, counter int) *Pinger {
+	return &Pinger{
+		stopC:    make(chan struct{}),
+		counter:  counter,
+		interval: interval,
+		out:      out,
+		url:      url,
+		ping:     ping,
+	}
+}
 
-	Stop()
+type Pinger struct {
+	ping Ping
 
-	Result() Result
+	stopOnce sync.Once
+	stopC    chan struct{}
+
+	out io.Writer
+
+	url *url.URL
+
+	interval time.Duration
+	counter  int
+
+	minDuration   time.Duration
+	maxDuration   time.Duration
+	totalDuration time.Duration
+	total         int
+	failedTotal   int
+}
+
+func (p *Pinger) Stop() {
+	p.stopOnce.Do(func() {
+		close(p.stopC)
+	})
+}
+
+func (p *Pinger) Done() <-chan struct{} {
+	return p.stopC
+}
+
+func (p *Pinger) Ping() {
+	defer p.Stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		<-p.Done()
+		cancel()
+	}()
+
+	interval := DefaultInterval
+	if p.interval > 0 {
+		interval = p.interval
+	}
+	timer := time.NewTimer(1)
+	defer timer.Stop()
+
+	stop := false
+	p.minDuration = time.Duration(math.MaxInt64)
+	for !stop {
+		select {
+		case <-timer.C:
+			stats := p.ping.Ping(ctx)
+			p.logStats(stats)
+			if p.total++; p.counter > 0 && p.total > p.counter-1 {
+				stop = true
+			}
+			timer.Reset(interval)
+		case <-p.Done():
+			stop = true
+		}
+	}
+}
+
+func (p *Pinger) Summarize() {
+
+	const tpl = `
+Ping statistics %s
+	%d probes sent.
+	%d successful, %d failed.
+Approximate trip times:
+	Minimum = %s, Maximum = %s, Average = %s`
+
+	_, _ = fmt.Fprintf(p.out, tpl, p.url.String(), p.total, p.total-p.failedTotal, p.failedTotal, p.minDuration, p.maxDuration, p.totalDuration/time.Duration(p.total))
+}
+
+func (p *Pinger) formatError(err error) string {
+	switch err := err.(type) {
+	case *url.Error:
+		if err.Timeout() {
+			return "timeout"
+		}
+		return p.formatError(err.Err)
+	case net.Error:
+		if err.Timeout() {
+			return "timeout"
+		}
+		if oe, ok := err.(*net.OpError); ok {
+			switch err := oe.Err.(type) {
+			case *os.SyscallError:
+				return err.Err.Error()
+			}
+		}
+	default:
+		if errors.Is(err, context.DeadlineExceeded) {
+			return "timeout"
+		}
+	}
+	return err.Error()
+}
+
+func (p *Pinger) logStats(stats *Stats) {
+	if stats.Duration < p.minDuration {
+		p.minDuration = stats.Duration
+	}
+	if stats.Duration > p.maxDuration {
+		p.maxDuration = stats.Duration
+	}
+	p.totalDuration += stats.Duration
+	if stats.Error != nil {
+		p.failedTotal++
+		if errors.Is(stats.Error, context.Canceled) {
+			// ignore cancel
+			return
+		}
+	}
+	status := "Failed"
+	if stats.Connected {
+		status = "connected"
+	}
+
+	if stats.Error != nil {
+		_, _ = fmt.Fprintf(p.out, "Ping %s(%s) %s(%s) - time=%s dns=%s", p.url.String(), stats.Address, status, p.formatError(stats.Error), stats.Duration, stats.DNSDuration)
+	} else {
+		_, _ = fmt.Fprintf(p.out, "Ping %s(%s) %s - time=%s dns=%s", p.url.String(), stats.Address, status, stats.Duration, stats.DNSDuration)
+	}
+	if len(stats.Meta) > 0 {
+		_, _ = fmt.Fprintf(p.out, " %s", stats.FormatMeta())
+	}
+	_, _ = fmt.Fprint(p.out, "\n")
+	if stats.Extra != nil {
+		_, _ = fmt.Fprintf(p.out, " %s\n", strings.TrimSpace(stats.Extra.String()))
+	}
 }
 
 // Result ...
@@ -118,33 +302,6 @@ Approximate trip times:
 	Minimum = {{.MinDuration}}, Maximum = {{.MaxDuration}}, Average = {{.Avg}}`
 	t := template.Must(template.New("result").Parse(resultTpl))
 	res := bytes.NewBufferString("")
-	t.Execute(res, result)
+	_ = t.Execute(res, result)
 	return res.String()
-}
-
-// CheckURI check uri
-func CheckURI(uri string) (schema, host string, port int, matched bool) {
-	const reExp = `^((?P<schema>((ht|f)tp(s?))|tcp)\://)?((([a-zA-Z0-9_\-]+\.)+[a-zA-Z]{2,})|((?:(?:25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)((\.?\d)\.)){4})|(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9]))(:([0-9]+))?(/[a-zA-Z0-9\-\._\?\,\'/\\\+&amp;%\$#\=~]*)?$`
-	pattern := regexp.MustCompile(reExp)
-	res := pattern.FindStringSubmatch(uri)
-	if len(res) == 0 {
-		return
-	}
-	matched = true
-	schema = res[2]
-	if schema == "" {
-		schema = "tcp"
-	}
-	host = res[6]
-	if res[17] == "" {
-		if schema == HTTPS.String() {
-			port = 443
-		} else {
-			port = 80
-		}
-	} else {
-		port, _ = strconv.Atoi(res[17])
-	}
-
-	return
 }

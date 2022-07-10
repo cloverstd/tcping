@@ -1,40 +1,15 @@
 package ping
 
 import (
-	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func timeIt(f func() interface{}) (int64, interface{}) {
-	startAt := time.Now()
-	res := f()
-	endAt := time.Now()
-	return endAt.UnixNano() - startAt.UnixNano(), res
-}
-
-// UseCustomDNS will set the dns to default DNS resolver for global
-func UseCustomDNS(dns []string) {
-	resolver := net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (conn net.Conn, err error) {
-			for _, addr := range dns {
-				if conn, err = net.Dial("udp", addr+":53"); err != nil {
-					continue
-				} else {
-					return conn, nil
-				}
-			}
-			return
-		},
-	}
-	net.DefaultResolver = &resolver
-}
-
-// FormatIP - trim spaces and format IP
+// FormatIP - trim spaces and format IP.
 //
 // IP - the provided IP
 //
@@ -52,7 +27,7 @@ func FormatIP(IP string) (string, error) {
 		}
 		return host, nil
 	}
-	return "", fmt.Errorf("Error IP format")
+	return "", fmt.Errorf("error IP format")
 }
 
 // ParseDuration parse the t as time.Duration, it will parse t as mills when missing unit.
@@ -61,4 +36,13 @@ func ParseDuration(t string) (time.Duration, error) {
 		return time.Duration(timeout) * time.Millisecond, nil
 	}
 	return time.ParseDuration(t)
+}
+
+// ParseAddress will try to parse addr as url.URL.
+func ParseAddress(addr string) (*url.URL, error) {
+	if strings.Contains(addr, "://") {
+		// it maybe with scheme, try url.Parse
+		return url.Parse(addr)
+	}
+	return url.Parse("tcp://" + addr)
 }

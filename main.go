@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/cloverstd/tcping/ping"
+	"github.com/cloverstd/tcping/ping/http"
+	"github.com/cloverstd/tcping/ping/tcp"
+	"github.com/spf13/cobra"
+	"net"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
-
-	"github.com/cloverstd/tcping/ping"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -16,15 +20,12 @@ var (
 	version     string
 	gitCommit   string
 	counter     int
-	proxy       string
 	timeout     string
 	interval    string
 	sigs        chan os.Signal
 
-	httpMode bool
-	httpHead bool
-	httpPost bool
-	httpUA   string
+	httpMethod string
+	httpUA     string
 
 	dnsServer []string
 )
@@ -39,7 +40,7 @@ var rootCmd = cobra.Command{
   2. ping over tcp with custom port
 	> tcping google.com 443
   3. ping over http
-  	> tcping -H google.com
+  	> tcping http://google.com
   4. ping with URI schema
   	> tcping https://hui.lu
 	`,
@@ -57,14 +58,19 @@ var rootCmd = cobra.Command{
 			cmd.Println("invalid command arguments")
 			return
 		}
-		host := args[0]
 
-		url, err := ping.ParseAddress(host)
+		url, err := ping.ParseAddress(args[0])
 		if err != nil {
-			fmt.Printf("%s is an invalid target.\n", host)
+			fmt.Printf("%s is an invalid target.\n", args[0])
 			return
 		}
+
 		defaultPort := "80"
+		if port := url.Port(); port != "" {
+			defaultPort = port
+		} else if url.Scheme == "https" {
+			defaultPort = "443"
+		}
 		if len(args) > 1 {
 			defaultPort = args[1]
 		}
@@ -74,10 +80,6 @@ var rootCmd = cobra.Command{
 			return
 		}
 		url.Host = fmt.Sprintf("%s:%d", url.Hostname(), port)
-
-		var (
-			schema string
-		)
 
 		timeoutDuration, err := ping.ParseDuration(timeout)
 		if err != nil {
@@ -93,9 +95,6 @@ var rootCmd = cobra.Command{
 			return
 		}
 
-		if httpMode {
-			url.Scheme = ping.HTTP.String()
-		}
 		protocol, err := ping.NewProtocol(url.Scheme)
 		if err != nil {
 			cmd.Println("invalid protocol", err)
@@ -103,75 +102,91 @@ var rootCmd = cobra.Command{
 			return
 		}
 
+		option := ping.Option{
+			Timeout: timeoutDuration,
+		}
 		if len(dnsServer) != 0 {
-			ping.UseCustomDNS(dnsServer)
-		}
-
-		parseHost, _ := ping.FormatIP(host)
-		if len(parseHost) <= 0 {
-			parseHost = host
-		}
-		target := ping.Target{
-			Timeout:  timeoutDuration,
-			Interval: intervalDuration,
-			Host:     parseHost,
-			Port:     port,
-			Counter:  counter,
-			Proxy:    proxy,
-			Protocol: protocol,
-		}
-		var pinger ping.Pinger
-		switch protocol {
-		case ping.TCP:
-			pinger = ping.NewTCPing()
-		case ping.HTTP, ping.HTTPS:
-			var httpMethod string
-			switch {
-			case httpHead:
-				httpMethod = "HEAD"
-			case httpPost:
-				httpMethod = "POST"
-			default:
-				httpMethod = "GET"
+			option.Resolver = &net.Resolver{
+				PreferGo: true,
+				Dial: func(ctx context.Context, network, address string) (conn net.Conn, err error) {
+					for _, addr := range dnsServer {
+						if conn, err = net.Dial("udp", addr+":53"); err != nil {
+							continue
+						} else {
+							return conn, nil
+						}
+					}
+					return
+				},
 			}
-			pinger = ping.NewHTTPing(httpMethod)
-		default:
-			fmt.Printf("schema: %s not support\n", schema)
+		}
+		pingFactory := ping.Load(protocol)
+		p, err := pingFactory(url, &option)
+		if err != nil {
+			cmd.Println("load pinger failed", err)
 			cmd.Usage()
 			return
 		}
-		pinger.SetTarget(&target)
-		pingerDone := pinger.Start()
-		select {
-		case <-pingerDone:
-			break
-		case <-sigs:
-			break
-		}
 
-		fmt.Println(pinger.Result())
+		pinger := ping.NewPinger(os.Stdout, url, p, intervalDuration, counter)
+		sigs = make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+		go pinger.Ping()
+		select {
+		case <-sigs:
+		case <-pinger.Done():
+		}
+		pinger.Stop()
+		pinger.Summarize()
 	},
 }
 
+func fixProxy(proxy string, op *ping.Option) error {
+	if proxy == "" {
+		return nil
+	}
+	u, err := url.Parse(proxy)
+	op.Proxy = u
+	return err
+}
+
 func init() {
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show the version and exit")
-	rootCmd.Flags().IntVarP(&counter, "counter", "c", 4, "ping counter")
-	rootCmd.Flags().StringVar(&proxy, "proxy", "", "Use HTTP proxy")
+	rootCmd.Flags().StringVar(&httpMethod, "http-method", "GET", `Use custom HTTP method instead of GET in http mode.`)
+	ua := rootCmd.Flags().String("user-agent", "tcping", `Use custom UA in http mode.`)
+	meta := rootCmd.Flags().Bool("meta", false, `With meta info`)
+	proxy := rootCmd.Flags().String("proxy", "", "Use HTTP proxy")
+
+	ping.Register(ping.HTTP, func(url *url.URL, op *ping.Option) (ping.Ping, error) {
+		if err := fixProxy(*proxy, op); err != nil {
+			return nil, err
+		}
+		op.UA = *ua
+		return http.New(httpMethod, url.String(), op, *meta)
+	})
+	ping.Register(ping.HTTPS, func(url *url.URL, op *ping.Option) (ping.Ping, error) {
+		if err := fixProxy(*proxy, op); err != nil {
+			return nil, err
+		}
+		op.UA = *ua
+		return http.New(httpMethod, url.String(), op, *meta)
+	})
+	ping.Register(ping.TCP, func(url *url.URL, op *ping.Option) (ping.Ping, error) {
+		port, err := strconv.Atoi(url.Port())
+		if err != nil {
+			return nil, err
+		}
+		return tcp.New(url.Hostname(), port, op, *meta), nil
+	})
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show the version and exit.")
+	rootCmd.Flags().IntVarP(&counter, "counter", "c", ping.DefaultCounter, "ping counter")
 	rootCmd.Flags().StringVarP(&timeout, "timeout", "T", "1s", `connect timeout, units are "ns", "us" (or "µs"), "ms", "s", "m", "h"`)
 	rootCmd.Flags().StringVarP(&interval, "interval", "I", "1s", `ping interval, units are "ns", "us" (or "µs"), "ms", "s", "m", "h"`)
-
-	rootCmd.Flags().BoolVarP(&httpMode, "http", "H", false, `Use "HTTP" mode. will ignore URI Schema, force to http`)
-	rootCmd.Flags().BoolVar(&httpHead, "head", false, `Use HEAD instead of GET in http mode.`)
-	rootCmd.Flags().BoolVar(&httpPost, "post", false, `Use POST instead of GET in http mode.`)
-	rootCmd.Flags().StringVar(&httpUA, "user-agent", "tcping", `Use custom UA in http mode.`)
 
 	rootCmd.Flags().StringArrayVarP(&dnsServer, "dns-server", "D", nil, `Use the specified dns resolve server.`)
 
 }
 
 func main() {
-	sigs = make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
