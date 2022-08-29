@@ -165,7 +165,7 @@ var rootCmd = cobra.Command{
 
 func init() {
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show the version and exit")
-	rootCmd.Flags().IntVarP(&counter, "counter", "c", 4, "ping counter")
+	rootCmd.Flags().IntVarP(&counter, "counter", "c", 0, "ping counter")
 	rootCmd.Flags().StringVar(&proxy, "proxy", "", "Use HTTP proxy")
 	rootCmd.Flags().StringVarP(&timeout, "timeout", "T", "1s", `connect timeout, units are "ns", "us" (or "µs"), "ms", "s", "m", "h"`)
 	rootCmd.Flags().StringVarP(&interval, "interval", "I", "1s", `ping interval, units are "ns", "us" (or "µs"), "ms", "s", "m", "h"`)

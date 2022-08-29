@@ -56,9 +56,9 @@ func (tcping TCPing) Start() <-chan struct{} {
 				tcping.result.Counter++
 
 				if err != nil {
-					fmt.Printf("Ping %s - failed: %s\n", tcping.target, err)
+					fmt.Printf("Ping %s - failed: %s at %s\n", tcping.target, err, time.Now().Format("15:04:05"))
 				} else {
-					fmt.Printf("Ping %s(%s) - Connected - time=%s\n", tcping.target, remoteAddr, duration)
+					fmt.Printf("Ping %s(%s) - Connected - time=%s at %s\n", tcping.target, remoteAddr, duration, time.Now().Format("15:04:05"))
 
 					if tcping.result.MinDuration == 0 {
 						tcping.result.MinDuration = duration

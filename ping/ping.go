@@ -22,7 +22,7 @@ func (protocol Protocol) String() string {
 	case HTTPS:
 		return "https"
 	}
-	return "unkown"
+	return "unknown"
 }
 
 const (
