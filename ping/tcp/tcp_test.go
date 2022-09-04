@@ -8,7 +8,7 @@ import (
 )
 
 func TestPing(t *testing.T) {
-	ping := tcp.New("google.com", 80, &tcping.Option{})
+	ping := tcp.New("google.com", 80, &tcping.Option{}, false)
 	stats := ping.Ping(context.Background())
 	if !stats.Connected {
 		t.Fatalf("ping failed, %s", stats.Error)
@@ -17,7 +17,7 @@ func TestPing(t *testing.T) {
 
 func TestPing_Failed(t *testing.T) {
 
-	ping := tcp.New("127.0.0.1", 1, &tcping.Option{})
+	ping := tcp.New("127.0.0.1", 1, &tcping.Option{}, false)
 	stats := ping.Ping(context.Background())
 	if stats.Connected {
 		t.Fatalf("it should be connected refused error")
