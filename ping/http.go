@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"golang.org/x/net/proxy"
 	"io"
 	"io/ioutil"
 	"net"
@@ -13,6 +12,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 // HTTPing ...
@@ -61,7 +62,7 @@ func (ping *HTTPing) Start() <-chan struct{} {
 				} else {
 					defer resp.Body.Close()
 					length, _ := io.Copy(ioutil.Discard, resp.Body)
-					fmt.Printf("Ping %s(%s) - %s is open - time=%s method=%s status=%d bytes=%d\n", ping.target, remoteAddr, ping.target.Protocol, duration, ping.Method, resp.StatusCode, length)
+					fmt.Printf("Ping %s(%s) - %s is open - time=%s method=%s status=%d bytes=%d at %s\n", ping.target, remoteAddr, ping.target.Protocol, duration, ping.Method, resp.StatusCode, length, time.Now().Format("15:04:05"))
 					if ping.result.MinDuration == 0 {
 						ping.result.MinDuration = duration
 					}
