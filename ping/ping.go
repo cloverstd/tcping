@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mattn/go-isatty"
 )
 
 var pinger = map[Protocol]Factory{}
@@ -255,8 +257,19 @@ func (p *Pinger) logStats(stats *Stats) {
 		status = "connected"
 	}
 
+	const colorRed = "\033[0;31m"
+	const colorNone = "\033[0m"
+
 	if stats.Error != nil {
-		_, _ = fmt.Fprintf(p.out, "Ping %s(%s) %s(%s) - time=%s dns=%s", p.url.String(), stats.Address, status, p.formatError(stats.Error), stats.Duration, stats.DNSDuration)
+		var colorBefore, colorAfter string
+		if isTerminal(p.out) {
+			colorBefore = colorRed
+			colorAfter = colorNone
+		} else {
+			colorBefore = ""
+			colorAfter = ""
+		}
+		_, _ = fmt.Fprintf(p.out, "%sPing %s(%s) %s(%s) - time=%s dns=%s%s", colorBefore, p.url.String(), stats.Address, status, p.formatError(stats.Error), stats.Duration, stats.DNSDuration, colorAfter)
 	} else {
 		_, _ = fmt.Fprintf(p.out, "Ping %s(%s) %s - time=%s dns=%s", p.url.String(), stats.Address, status, stats.Duration, stats.DNSDuration)
 	}
@@ -267,6 +280,16 @@ func (p *Pinger) logStats(stats *Stats) {
 	if stats.Extra != nil {
 		_, _ = fmt.Fprintf(p.out, " %s\n", strings.TrimSpace(stats.Extra.String()))
 	}
+}
+
+func isTerminal(out io.Writer) bool {
+	if out == nil {
+		return false
+	}
+	if f, ok := out.(*os.File); ok {
+		return isatty.IsTerminal(f.Fd())
+	}
+	return false
 }
 
 // Result ...
