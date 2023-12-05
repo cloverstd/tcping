@@ -30,6 +30,7 @@ func FormatIP(IP string) (string, error) {
 	return "", fmt.Errorf("error IP format")
 }
 
+
 // ParseDuration parse the t as time.Duration, it will parse t as mills when missing unit.
 func ParseDuration(t string) (time.Duration, error) {
 	if timeout, err := strconv.ParseInt(t, 10, 64); err == nil {
@@ -38,8 +39,26 @@ func ParseDuration(t string) (time.Duration, error) {
 	return time.ParseDuration(t)
 }
 
+func GetUrlHost(host string, port int) string {
+	if port <= 0 {
+		return host
+	}
+	if ipAddr, err := FormatIP(host); err == nil {
+		return fmt.Sprintf("%s:%d", ipAddr, port)
+	}
+	
+	return fmt.Sprintf("%s:%d", host, port)
+
+}
+
 // ParseAddress will try to parse addr as url.URL.
 func ParseAddress(addr string) (*url.URL, error) {
+	if ipAddr, err := FormatIP(addr); err == nil {
+		return &url.URL{
+			Scheme: "tcp",
+			Host:   ipAddr,
+		}, nil
+	}
 	if strings.Contains(addr, "://") {
 		// it maybe with scheme, try url.Parse
 		return url.Parse(addr)

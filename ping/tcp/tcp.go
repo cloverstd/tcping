@@ -61,17 +61,17 @@ func (p *Ping) Ping(ctx context.Context) *ping.Stats {
 		tlsErr  error
 	)
 	if p.tls {
-		tlsConn, err = tls.DialWithDialer(p.dialer, "tcp", fmt.Sprintf("%s:%d", p.host, p.port), &tls.Config{
+		tlsConn, err = tls.DialWithDialer(p.dialer, "tcp", ping.GetUrlHost(p.host, p.port), &tls.Config{
 			InsecureSkipVerify: true,
 		})
 		if err == nil {
 			conn = tlsConn.NetConn()
 		} else {
 			tlsErr = err
-			conn, err = p.dialer.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", p.host, p.port))
+			conn, err = p.dialer.DialContext(ctx, "tcp", ping.GetUrlHost(p.host, p.port))
 		}
 	} else {
-		conn, err = p.dialer.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", p.host, p.port))
+		conn, err = p.dialer.DialContext(ctx, "tcp", ping.GetUrlHost(p.host, p.port))
 	}
 	stats.Duration = time.Since(start)
 	if err != nil {
