@@ -8,6 +8,8 @@ tcping is like [tcping.exe](https://elifulkerson.com/projects/tcping.php), but w
 
 - If the port is omitted, the default port is 80.
 
+- IPv6 targets should use the standard bracket syntax when a port is included, for example `[::1]:443` or `https://[::1]`.
+
 - The default interval of ping is 1s.
 
 - The default timeout of ping is 1s.

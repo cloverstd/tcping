@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -87,7 +88,7 @@ type Target struct {
 }
 
 func (target Target) String() string {
-	return fmt.Sprintf("%s://%s:%d", target.Protocol, target.Host, target.Port)
+	return fmt.Sprintf("%s://%s", target.Protocol, net.JoinHostPort(target.Host, strconv.Itoa(target.Port)))
 }
 
 type Stats struct {

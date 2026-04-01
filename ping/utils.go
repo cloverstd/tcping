@@ -44,5 +44,8 @@ func ParseAddress(addr string) (*url.URL, error) {
 		// it maybe with scheme, try url.Parse
 		return url.Parse(addr)
 	}
+	if host, err := FormatIP(addr); err == nil {
+		addr = host
+	}
 	return url.Parse("tcp://" + addr)
 }

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -79,7 +80,7 @@ var rootCmd = cobra.Command{
 			cmd.Printf("%s is invalid port.\n", defaultPort)
 			return
 		}
-		url.Host = fmt.Sprintf("%s:%d", url.Hostname(), port)
+		url.Host = net.JoinHostPort(url.Hostname(), strconv.Itoa(port))
 
 		timeoutDuration, err := ping.ParseDuration(timeout)
 		if err != nil {
@@ -110,7 +111,7 @@ var rootCmd = cobra.Command{
 				PreferGo: true,
 				Dial: func(ctx context.Context, network, address string) (conn net.Conn, err error) {
 					for _, addr := range dnsServer {
-						if conn, err = net.Dial("udp", addr+":53"); err != nil {
+						if conn, err = net.Dial("udp", net.JoinHostPort(strings.Trim(addr, "[]"), "53")); err != nil {
 							continue
 						} else {
 							return conn, nil

@@ -8,6 +8,7 @@ import (
 	"github.com/cloverstd/tcping/ping"
 	"net"
 	"net/http/httptrace"
+	"strconv"
 	"time"
 )
 
@@ -61,17 +62,17 @@ func (p *Ping) Ping(ctx context.Context) *ping.Stats {
 		tlsErr  error
 	)
 	if p.tls {
-		tlsConn, err = tls.DialWithDialer(p.dialer, "tcp", fmt.Sprintf("%s:%d", p.host, p.port), &tls.Config{
+		tlsConn, err = tls.DialWithDialer(p.dialer, "tcp", net.JoinHostPort(p.host, strconv.Itoa(p.port)), &tls.Config{
 			InsecureSkipVerify: true,
 		})
 		if err == nil {
 			conn = tlsConn.NetConn()
 		} else {
 			tlsErr = err
-			conn, err = p.dialer.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", p.host, p.port))
+			conn, err = p.dialer.DialContext(ctx, "tcp", net.JoinHostPort(p.host, strconv.Itoa(p.port)))
 		}
 	} else {
-		conn, err = p.dialer.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", p.host, p.port))
+		conn, err = p.dialer.DialContext(ctx, "tcp", net.JoinHostPort(p.host, strconv.Itoa(p.port)))
 	}
 	stats.Duration = time.Since(start)
 	if err != nil {
