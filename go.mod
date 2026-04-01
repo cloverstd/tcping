@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/spf13/cobra v1.3.0
-	golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d
 )
 
 require (

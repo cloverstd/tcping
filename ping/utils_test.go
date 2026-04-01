@@ -43,7 +43,7 @@ func TestFormatIP(t *testing.T) {
 
 func TestParseAddress(t *testing.T) {
 	Convey("ParseAddress", t, func() {
-		Convey("formats bare ipv6 host", func() {
+		Convey("formats bare IPv6 host", func() {
 			u, err := ParseAddress("2001:db8::1")
 			So(err, ShouldBeNil)
 			So(u.Scheme, ShouldEqual, "tcp")
@@ -52,7 +52,7 @@ func TestParseAddress(t *testing.T) {
 			So(u.Port(), ShouldEqual, "")
 		})
 
-		Convey("keeps bracketed ipv6 host with port", func() {
+		Convey("keeps bracketed IPv6 host with port", func() {
 			u, err := ParseAddress("[2001:db8::1]:443")
 			So(err, ShouldBeNil)
 			So(u.Scheme, ShouldEqual, "tcp")

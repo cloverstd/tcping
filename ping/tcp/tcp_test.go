@@ -29,7 +29,7 @@ func TestPing_Failed(t *testing.T) {
 func TestPing_IPv6(t *testing.T) {
 	ln, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
-		t.Skipf("ipv6 is unavailable: %v", err)
+		t.Skipf("IPv6 is unavailable: %v", err)
 	}
 	defer ln.Close()
 
@@ -46,7 +46,7 @@ func TestPing_IPv6(t *testing.T) {
 	ping := tcp.New(addr.IP.String(), addr.Port, &tcping.Option{}, false)
 	stats := ping.Ping(context.Background())
 	if !stats.Connected {
-		t.Fatalf("ipv6 ping failed, %s", stats.Error)
+		t.Fatalf("IPv6 ping failed, %s", stats.Error)
 	}
 
 	select {
