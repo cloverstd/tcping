@@ -9,13 +9,11 @@ import (
 	"time"
 )
 
-// FormatIP - trim spaces and format IP.
+// FormatIP trims spaces and formats an IP string.
 //
-// IP - the provided IP
-//
-// string - return "" if the input is neither valid IPv4 nor valid IPv6
-//          return IPv4 in format like "192.168.9.1"
-//          return IPv6 in format like "[2002:ac1f:91c5:1::bd59]"
+// It returns "" if the input is neither valid IPv4 nor valid IPv6.
+// It returns IPv4 in format like "192.168.9.1".
+// It returns IPv6 in format like "[2002:ac1f:91c5:1::bd59]".
 func FormatIP(IP string) (string, error) {
 
 	host := strings.Trim(IP, "[ ]")
